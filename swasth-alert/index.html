@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>SwasthAlert - Clinical Triage & UHID System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Browser Tab Pulse Logo (Favicon) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%236366f1'/><stop offset='100%' stop-color='%23ec4899'/></linearGradient></defs><circle cx='50' cy='50' r='48' fill='url(%23g)'/><path d='M25 50 h15 l7 -18 l10 36 l8 -24 l6 6 h9' fill='none' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 740px; margin: 25px auto; padding: 15px; background: #f0f2f5; }
+        .card { background: #ffffff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+        h2 { color: #0b5cff; text-align: center; margin-top: 0; }
+        .section-title { font-weight: bold; font-size: 15px; color: #0b5cff; border-bottom: 2px solid #eef2f6; padding-bottom: 5px; margin: 18px 0 10px 0; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 4px; color: #333; }
+        input, select, textarea { width: 100%; box-sizing: border-box; padding: 9px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        textarea { resize: vertical; height: 50px; }
+        .submit-btn { width: 100%; padding: 13px; background: #0b5cff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        .submit-btn:hover { background: #0045c7; }
+        .fetch-btn { padding: 9px 14px; background: #28a745; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .fetch-btn:hover { background: #218838; }
+        .grid { display: flex; gap: 10px; }
+        .grid .form-group { flex: 1; }
+        
+        .bmi-box { background: #f0f7ff; border: 1px solid #cce3ff; border-radius: 8px; padding: 12px; margin: 10px 0; text-align: center; }
+        .bmi-val { font-size: 22px; font-weight: bold; color: #0b5cff; }
+        .bmi-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+        .Overweight { background: #ffeeba; color: #856404; }
+        .Normal { background: #d4edda; color: #155724; }
+        
+        #result { margin-top: 20px; padding: 18px; border-radius: 8px; border: 1px solid #b8daff; background: #f8fbff; }
+        .uhid-badge { background: #1e3a8a; color: white; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; font-weight: bold; }
+
+        .history-table-container { display: none; margin-top: 15px; background: white; border: 1px solid #ddd; border-radius: 8px; overflow-x: auto; padding: 12px; }
+        table.visit-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        table.visit-table th, table.visit-table td { padding: 9px 10px; text-align: left; border-bottom: 1px solid #eee; }
+        table.visit-table th { background: #f1f5f9; color: #0b5cff; font-weight: bold; }
+        .status-badge { padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+        .status-attended { background: #d4edda; color: #155724; }
+        .status-missed { background: #f8d7da; color: #721c24; }
+        .status-upcoming { background: #cce5ff; color: #004085; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 4% auto; padding: 22px; border-radius: 10px; max-width: 520px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-header { font-size: 18px; font-weight: bold; color: #d9534f; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .btn-confirm { background: #d9534f; color: white; padding: 11px; width: 100%; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 15px; }
+        .btn-close { background: #6c757d; color: white; padding: 8px; width: 100%; border: none; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>SwasthAlert: Universal Patient Triage</h2>
+        
+        <div class="section-title">1. Patient Lookup & Universal ID (UHID)</div>
+        <div style="background:#eaf2ff; border:1px solid #cce3ff; border-radius:8px; padding:12px; margin-bottom:15px;">
+            <label style="color:#0b5cff;">Enter / Select Unique Patient ID (UHID):</label>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input id="uhid" type="text" value="SWASTH-TN-94821" style="font-family:monospace; font-weight:bold; font-size:15px; flex:2;" />
+                <select id="sampleUHID" onchange="applySampleUHID()" style="flex:2; font-size:13px;">
+                    <option value="SWASTH-TN-94821">Murugan K (ID: SWASTH-TN-94821)</option>
+                    <option value="SWASTH-TN-10452">Anitha S (ID: SWASTH-TN-10452)</option>
+                    <option value="SWASTH-TN-88219">Karthik R (ID: SWASTH-TN-88219)</option>
+                </select>
+                <button class="fetch-btn" onclick="fetchPatientByUHID()">🔍 Fetch</button>
+            </div>
+            <small style="color:#555; display:block; margin-top:5px;">💡 Vera hospital ponaalum indha ID vechi avanga records-a instant-aa eduthuralaam.</small>
+        </div>
+
+        <div class="form-group">
+            <label>Patient Full Name:</label>
+            <input id="name" type="text" value="Murugan K" />
+        </div>
+        <div class="grid">
+            <div class="form-group">
+                <label>Phone Number:</label>
+                <input id="phone" type="tel" value="9876543210" />
+            </div>
+            <div class="form-group">
+                <label>Age:</label>
+                <input id="age" type="number" value="54" />
+            </div>
+            <div class="form-group">
+                <label>Blood Group:</label>
+                <select id="blood">
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="A+">A+</option>
+                    <option value="B+">B+</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-title">2. Physical Assessment & Live BMI Calculator</div>
+        <div class="grid">
+            <div class="form-group">
+                <label>Height (cm):</label>
+                <input id="height" type="number" value="165" oninput="calcBMI()" />
+            </div>
+            <div class="form-group">
+                <label>Weight (kg):</label>
+                <input id="weight" type="number" value="70" oninput="calcBMI()" />
+            </div>
+        </div>
+        <div class="bmi-box">
+            Live BMI: <span id="bmiScore" class="bmi-val">25.7</span> | 
+            <span id="bmiTag" class="bmi-badge Overweight">Overweight</span> | 
+            <small id="idealRange">Ideal: 50.4 - 67.8 kg</small>
+        </div>
+
+        <div class="section-title">3. Primary Hospital & Treatment Continuity</div>
+        <div class="grid">
+            <div class="form-group">
+                <label>Treating Hospital / Clinic:</label>
+                <input id="treating_hospital" type="text" value="Govt Rajaji Hospital, Madurai" />
+            </div>
+            <div class="form-group">
+                <label>Treatment Duration at this Hospital:</label>
+                <input id="treatment_years" type="text" value="3 Years (Since March 2023)" />
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="form-group">
+                <label>Last Visited (Date, Time, Day):</label>
+                <input id="detailed_timestamp" type="text" value="28 Feb 2026, 03:59 PM (Saturday)" />
+            </div>
+            <div class="form-group">
+                <label>Next Scheduled Visit:</label>
+                <input id="next_visit" type="text" value="15 Mar 2026, 10:30 AM (Sunday)" />
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="form-group">
+                <label>Consulting Doctor:</label>
+                <input id="doctor" type="text" value="Dr. S. Ramanathan, MD" />
+            </div>
+            <div class="form-group">
+                <label>Total Consultations Recorded:</label>
+                <input id="total_visits" type="text" value="6 Historical Consultations" />
+            </div>
+        </div>
+
+        <div class="section-title">4. Diagnosis, Medications & Side Effects</div>
+        <div class="form-group">
+            <label>Primary Diagnosis / Health Issue:</label>
+            <input id="diagnosis" type="text" value="Type 2 Diabetes Mellitus & Hypertension" />
+        </div>
+        <div class="form-group">
+            <label>Known Drug Allergies:</label>
+            <input id="allergies" type="text" value="Penicillin Allergy, Sulfa Drugs" />
+        </div>
+        <div class="form-group">
+            <label>Current Medications Taken:</label>
+            <input id="current_meds" type="text" value="Metformin 500mg (Daily), Telmisartan 40mg" />
+        </div>
+        <div class="form-group">
+            <label>Reported Side Effects:</label>
+            <input id="side_effects" type="text" value="Dizziness, Mild Nausea" />
+        </div>
+
+        <button class="submit-btn" onclick="generateReport()">Generate Clinical Triage Report</button>
+
+        <div id="result" style="display:none;"></div>
+    </div>
+
+    <!-- Emergency Modal -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">🚨 GPS Auto-Ranked Emergency Dispatch</div>
+            <div id="gpsStatus" style="font-size:12px; font-weight:bold; color:#28a745; margin-bottom:8px;">📡 Sorting nearest hospital...</div>
+            <div class="form-group">
+                <label>Nearest Hospital Center:</label>
+                <select id="hospitalPreset" onchange="selectHospitalPreset()"></select>
+            </div>
+            <div class="form-group">
+                <label>Destination Hospital:</label>
+                <input id="modalHospital" type="text" />
+            </div>
+            <div class="form-group">
+                <label>Attending Doctor:</label>
+                <input id="modalDoctor" type="text" />
+            </div>
+            <div class="form-group">
+                <label>Emergency Note:</label>
+                <textarea id="modalNote" style="height:55px;"></textarea>
+            </div>
+            <button class="btn-confirm" onclick="confirmDispatch()">Confirm & Dispatch Alert</button>
+            <button class="btn-close" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // Centralized Multi-Patient Database (UHID Store)
+        const patientDatabase = {
+            "SWASTH-TN-94821": {
+                name: "Murugan K",
+                phone: "9876543210",
+                age: 54,
+                blood: "O+",
+                height: 165,
+                weight: 70,
+                hospital: "Govt Rajaji Hospital, Madurai",
+                treatment_years: "3 Years (Since March 2023)",
+                last_visit: "28 Feb 2026, 03:59 PM (Saturday)",
+                next_visit: "15 Mar 2026, 10:30 AM (Sunday)",
+                doctor: "Dr. S. Ramanathan, MD",
+                total_visits: "6 Historical Consultations",
+                diagnosis: "Type 2 Diabetes Mellitus & Hypertension",
+                allergies: "Penicillin Allergy, Sulfa Drugs",
+                meds: "Metformin 500mg (Daily), Telmisartan 40mg",
+                side_effects: "Dizziness, Mild Nausea",
+                risk_score: "94.7%",
+                priority: "High",
+                history: [
+                    { date_time: "15 Mar 2026, 10:30 AM (Sunday)", hospital: "Govt Rajaji Hospital, Madurai", doctor: "Dr. S. Ramanathan, MD", purpose: "Quarterly HbA1c & BP Review", status: "Upcoming", class: "status-upcoming" },
+                    { date_time: "28 Feb 2026, 03:59 PM (Saturday)", hospital: "Govt Rajaji Hospital, Madurai", doctor: "Dr. S. Ramanathan, MD", purpose: "Medication refill & Reported Dizziness", status: "Attended", class: "status-attended" },
+                    { date_time: "10 Feb 2026, 11:15 AM (Tuesday)", hospital: "Govt Rajaji Hospital, Madurai", doctor: "Dr. P. Balaji", purpose: "Follow-up missed due to travel", status: "Missed Dose", class: "status-missed" },
+                    { date_time: "12 Jan 2026, 11:20 AM (Monday)", hospital: "Meenakshi Mission Hospital, Madurai", doctor: "Dr. V. Ganesh, MD", purpose: "Hypertension dosage adjustment", status: "Attended", class: "status-attended" },
+                    { date_time: "05 Nov 2025, 05:45 PM (Wednesday)", hospital: "Apollo Speciality Hospital, Chennai", doctor: "Dr. R. Rajesh, MD", purpose: "Acute Gastric Episode & Allergy Testing", status: "Attended", class: "status-attended" },
+                    { date_time: "18 Mar 2023, 10:00 AM (Saturday)", hospital: "Govt Rajaji Hospital, Madurai", doctor: "Dr. S. Ramanathan, MD", purpose: "Initial Registration (3 Yrs Treatment Start)", status: "First Visit", class: "status-attended" }
+                ]
+            },
+            "SWASTH-TN-10452": {
+                name: "Anitha S",
+                phone: "9123456780",
+                age: 38,
+                blood: "B+",
+                height: 158,
+                weight: 56,
+                hospital: "Apollo Speciality Hospital, Madurai",
+                treatment_years: "1.5 Years (Since Oct 2024)",
+                last_visit: "20 Feb 2026, 11:00 AM (Friday)",
+                next_visit: "25 Mar 2026, 04:30 PM (Wednesday)",
+                doctor: "Dr. K. Anbarasu (Pulmonology Lead)",
+                total_visits: "4 Historical Consultations",
+                diagnosis: "Severe Chronic Asthma & Allergic Rhinitis",
+                allergies: "Aspirin, NSAIDs, Dust Mites",
+                meds: "Budesonide Inhaler, Montelukast 10mg",
+                side_effects: "Dry Throat, Tremors",
+                risk_score: "62.3%",
+                priority: "Moderate",
+                history: [
+                    { date_time: "25 Mar 2026, 04:30 PM (Wednesday)", hospital: "Apollo Speciality Hospital, Madurai", doctor: "Dr. K. Anbarasu", purpose: "Spirometry Breathing Test", status: "Upcoming", class: "status-upcoming" },
+                    { date_time: "20 Feb 2026, 11:00 AM (Friday)", hospital: "Apollo Speciality Hospital, Madurai", doctor: "Dr. K. Anbarasu", purpose: "Inhaler refilled, reported mild throat dryness", status: "Attended", class: "status-attended" },
+                    { date_time: "14 Dec 2025, 02:15 PM (Sunday)", hospital: "City Care Hospital, Madurai", doctor: "Dr. P. Balaji", purpose: "Sudden wheezing emergency nebulizer", status: "Attended", class: "status-attended" },
+                    { date_time: "02 Oct 2024, 10:30 AM (Wednesday)", hospital: "Apollo Speciality Hospital, Madurai", doctor: "Dr. K. Anbarasu", purpose: "Initial Asthma Registration", status: "First Visit", class: "status-attended" }
+                ]
+            },
+            "SWASTH-TN-88219": {
+                name: "Karthik R",
+                phone: "9841029384",
+                age: 62,
+                blood: "A+",
+                height: 172,
+                weight: 84,
+                hospital: "Meenakshi Mission Hospital, Madurai",
+                treatment_years: "4 Years (Since Jan 2022)",
+                last_visit: "26 Feb 2026, 05:15 PM (Thursday)",
+                next_visit: "10 Mar 2026, 09:00 AM (Tuesday)",
+                doctor: "Dr. V. Ganesh, MD (Nephrology)",
+                total_visits: "9 Historical Consultations",
+                diagnosis: "Stage 3 Chronic Kidney Disease & Hypertension",
+                allergies: "Ibuprofen, Contrast Dye",
+                meds: "Torsemide 20mg, Amlodipine 5mg",
+                side_effects: "Swelling in ankles, Muscle Cramps",
+                risk_score: "89.5%",
+                priority: "High",
+                history: [
+                    { date_time: "10 Mar 2026, 09:00 AM (Tuesday)", hospital: "Meenakshi Mission Hospital, Madurai", doctor: "Dr. V. Ganesh, MD", purpose: "Serum Creatinine & Electrolytes Panel", status: "Upcoming", class: "status-upcoming" },
+                    { date_time: "26 Feb 2026, 05:15 PM (Thursday)", hospital: "Meenakshi Mission Hospital, Madurai", doctor: "Dr. V. Ganesh, MD", purpose: "Severe ankle swelling checkup", status: "Attended", class: "status-attended" },
+                    { date_time: "08 Jan 2026, 10:00 AM (Thursday)", hospital: "Govt Rajaji Hospital, Madurai", doctor: "Dr. S. Ramanathan, MD", purpose: "Emergency BP Spike management", status: "Attended", class: "status-attended" },
+                    { date_time: "15 Jan 2022, 11:30 AM (Saturday)", hospital: "Meenakshi Mission Hospital, Madurai", doctor: "Dr. V. Ganesh, MD", purpose: "CKD Baseline Protocol Registration", status: "First Visit", class: "status-attended" }
+                ]
+            }
+        };
+
+        function applySampleUHID() {
+            document.getElementById('uhid').value = document.getElementById('sampleUHID').value;
+            fetchPatientByUHID();
+        }
+
+        function fetchPatientByUHID() {
+            const id = document.getElementById('uhid').value.trim();
+            const p = patientDatabase[id];
+            if (!p) {
+                alert("❌ Patient Record not found for UHID: " + id);
+                return;
+            }
+
+            document.getElementById('name').value = p.name;
+            document.getElementById('phone').value = p.phone;
+            document.getElementById('age').value = p.age;
+            document.getElementById('blood').value = p.blood;
+            document.getElementById('height').value = p.height;
+            document.getElementById('weight').value = p.weight;
+            document.getElementById('treating_hospital').value = p.hospital;
+            document.getElementById('treatment_years').value = p.treatment_years;
+            document.getElementById('detailed_timestamp').value = p.last_visit;
+            document.getElementById('next_visit').value = p.next_visit;
+            document.getElementById('doctor').value = p.doctor;
+            document.getElementById('total_visits').value = p.total_visits;
+            document.getElementById('diagnosis').value = p.diagnosis;
+            document.getElementById('allergies').value = p.allergies;
+            document.getElementById('current_meds').value = p.meds;
+            document.getElementById('side_effects').value = p.side_effects;
+
+            calcBMI();
+            generateReport();
+            alert(`✅ Patient Records Successfully Loaded for UHID: ${id}\nPatient: ${p.name} (${p.hospital})`);
+        }
+
+        let currentReport = {};
+
+        const hospitalNetwork = [
+            { id: "h1", name: "Govt Rajaji Hospital (Emergency & Trauma)", lat: 9.9252, lon: 78.1348, doctor: "Dr. P. Balaji (Emergency Officer)", contact: "+91-9443210002" },
+            { id: "h2", name: "City Care Hospital, ICU Ward", lat: 9.9120, lon: 78.1450, doctor: "Dr. K. Anbarasu (Duty Registrar)", contact: "+91-9443210001" },
+            { id: "h3", name: "Apollo Speciality Hospital", lat: 9.9328, lon: 78.1492, doctor: "Dr. S. Ramanathan, MD", contact: "+91-9443210003" }
+        ];
+
+        function calcBMI() {
+            const h = parseFloat(document.getElementById('height').value);
+            const w = parseFloat(document.getElementById('weight').value);
+            if (!h || !w || h <= 0 || w <= 0) return;
+            const hm = h / 100;
+            const bmi = (w / (hm * hm)).toFixed(1);
+            document.getElementById('bmiScore').innerText = bmi;
+            const minW = (18.5 * hm * hm).toFixed(1);
+            const maxW = (24.9 * hm * hm).toFixed(1);
+            document.getElementById('idealRange').innerText = `Ideal: ${minW} - ${maxW} kg`;
+        }
+
+        function getDistanceKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return parseFloat((R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(2));
+        }
+
+        function populateSortedHospitals(userLat, userLon) {
+            let sorted = hospitalNetwork.map(h => ({ ...h, distance: userLat ? getDistanceKm(userLat, userLon, h.lat, h.lon) : null }));
+            if (userLat) sorted.sort((a,b) => a.distance - b.distance);
+            const select = document.getElementById('hospitalPreset');
+            select.innerHTML = '';
+            sorted.forEach((h, idx) => {
+                const opt = document.createElement('option');
+                opt.value = h.id;
+                opt.innerText = `${idx===0 ? "🟢 [NEAREST] " : ""}${h.name} (~${h.distance||0} km)`;
+                select.appendChild(opt);
+            });
+            window.activeSortedHospitals = sorted;
+            selectHospitalPreset();
+        }
+
+        function selectHospitalPreset() {
+            const item = window.activeSortedHospitals.find(h => h.id === document.getElementById('hospitalPreset').value);
+            if (!item) return;
+            document.getElementById('modalHospital').value = `${item.name} (${item.distance||0} km)`;
+            document.getElementById('modalDoctor').value = `${item.doctor} (${item.contact})`;
+        }
+
+        function openLiveGoogleMaps() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => window.open(`https://www.google.com/maps/search/hospital/@${pos.coords.latitude},${pos.coords.longitude},14z`, '_blank'),
+                    err => window.open('https://www.google.com/maps/search/hospitals+near+me', '_blank')
+                );
+            } else {
+                window.open('https://www.google.com/maps/search/hospitals+near+me', '_blank');
+            }
+        }
+
+        function toggleHistoryTable() {
+            const el = document.getElementById('historyTableBox');
+            const btn = document.getElementById('historyToggleBtn');
+            if (el.style.display === 'none' || el.style.display === '') {
+                el.style.display = 'block';
+                btn.innerText = '🔼 Hide Visit History';
+            } else {
+                el.style.display = 'none';
+                btn.innerText = '📋 View Full Visit History (Records)';
+            }
+        }
+
+        function generateReport() {
+            const uhid = document.getElementById('uhid').value.trim();
+            const p = patientDatabase[uhid] || {
+                risk_score: "94.7%",
+                priority: "High",
+                history: []
+            };
+
+            const name = document.getElementById('name').value;
+            const blood = document.getElementById('blood').value;
+            const phone = document.getElementById('phone').value;
+            const timeStamp = document.getElementById('detailed_timestamp').value;
+            const nextVisit = document.getElementById('next_visit').value;
+            const treatYears = document.getElementById('treatment_years').value;
+            const hosp = document.getElementById('treating_hospital').value;
+            const doc = document.getElementById('doctor').value;
+            const diag = document.getElementById('diagnosis').value;
+            const allergy = document.getElementById('allergies').value;
+            const meds = document.getElementById('current_meds').value;
+            const effects = document.getElementById('side_effects').value;
+
+            currentReport = { name, uhid, blood, phone, timeStamp, nextVisit, treatYears, hosp, doc, diag, allergy, meds, effects, risk_score: p.risk_score, priority: p.priority };
+
+            let rowsHtml = (p.history.length > 0 ? p.history : [
+                { date_time: timeStamp, hospital: hosp, doctor: doc, purpose: "Routine Follow-up", status: "Attended", class: "status-attended" }
+            ]).map(log => `
+                <tr>
+                    <td style="font-weight:bold; white-space:nowrap;">${log.date_time}</td>
+                    <td>${log.hospital}</td>
+                    <td>${log.doctor}</td>
+                    <td>${log.purpose}</td>
+                    <td><span class="status-badge ${log.class}">${log.status}</span></td>
+                </tr>
+            `).join('');
+
+            const box = document.getElementById('result');
+            box.style.display = 'block';
+            box.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <h3 style="margin:0;">Patient: ${name} | Blood: <span style="color:#b91c1c;">${blood}</span></h3>
+                    <span class="uhid-badge">UHID: ${uhid}</span>
+                </div>
+                
+                <p style="margin-top:10px;">Risk Score: <b style="color: red;">${currentReport.risk_score}</b> | Priority: <span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:4px; font-weight:bold;">${currentReport.priority}</span></p>
+                <p>Recommended Action: <b>Immediate Doctor Callback (${doc}) + Review Current Medications</b></p>
+                <p>Target Contact: <b>${phone}</b></p>
+
+                <div style="margin:12px 0; background:#e8f4fd; border:1px solid #b8daff; border-radius:8px; padding:12px; font-size:14px;">
+                    <p style="margin:4px 0;">🏥 <b>Hospital Continuity:</b> Under care at <b>${hosp}</b> for <span style="background:#cce5ff; color:#004085; padding:2px 6px; border-radius:4px; font-weight:bold;">${treatYears}</span></p>
+                    <p style="margin:4px 0;">🕒 <b>Last Consulted:</b> <b>${timeStamp}</b></p>
+                    <p style="margin:4px 0;">📅 <b>Next Scheduled Visit:</b> <span style="background:#d4edda; color:#155724; padding:2px 6px; border-radius:4px; font-weight:bold;">${nextVisit}</span></p>
+                </div>
+
+                <div style="display: flex; gap: 8px; margin: 15px 0; flex-wrap: wrap;">
+                    <a href="tel:${phone}" style="padding: 10px 14px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px;">📞 Call Patient</a>
+                    <a href="sms:${phone}?body=SwasthAlert: Urgent clinical follow-up required. Your next visit is on ${nextVisit}. Contact ${doc}." 
+                       style="padding: 10px 14px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px;">💬 Send SMS</a>
+                    <button onclick="openLiveGoogleMaps()" style="padding: 10px 14px; background: #17a2b8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">🗺️ Nearby Hospitals (Google Maps)</button>
+                    <button onclick="openModal()" style="padding: 10px 14px; background: #d9534f; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">🚨 Send Doctor Emergency Alert</button>
+                    <button id="historyToggleBtn" onclick="toggleHistoryTable()" style="padding: 10px 14px; background: #4a5568; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">📋 View Full Visit History (Records)</button>
+                </div>
+
+                <div id="historyTableBox" class="history-table-container">
+                    <h4 style="margin:0 0 10px 0; color:#0b5cff;">📋 Cross-Hospital Treatment History (UHID: ${uhid}):</h4>
+                    <table class="visit-table">
+                        <thead>
+                            <tr>
+                                <th>Date, Time & Day</th>
+                                <th>Hospital / Clinic</th>
+                                <th>Doctor</th>
+                                <th>Reason / Treatment</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
+        function openModal() {
+            document.getElementById('modalNote').value = `URGENT: Patient ${currentReport.name} (UHID: ${currentReport.uhid}) under care for ${currentReport.treatYears} requires immediate review. Next visit: ${currentReport.nextVisit}. Reported: ${currentReport.effects}.`;
+            document.getElementById('alertModal').style.display = 'block';
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => populateSortedHospitals(pos.coords.latitude, pos.coords.longitude),
+                    err => populateSortedHospitals(9.9252, 78.1348)
+                );
+            } else {
+                populateSortedHospitals(9.9252, 78.1348);
+            }
+        }
+
+        function closeModal() { document.getElementById('alertModal').style.display = 'none'; }
+
+        async function confirmDispatch() {
+            const hospital = document.getElementById('modalHospital').value;
+            const doctor = document.getElementById('modalDoctor').value;
+            const note = document.getElementById('modalNote').value;
+
+            try {
+                const res = await fetch('/dispatch-alert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_name: `${currentReport.name} [UHID: ${currentReport.uhid}]`,
+                        phone: currentReport.phone,
+                        doctor: doctor,
+                        hospital_name: hospital,
+                        hospital_address: "Emergency Dispatch Route",
+                        doctor_contact: doctor,
+                        risk_score: currentReport.risk_score,
+                        summary: note
+                    })
+                });
+                const result = await res.json();
+                closeModal();
+                alert(`✅ Emergency Alert Routed With UHID Records!\n\nUHID: ${currentReport.uhid}\nTarget Hospital: ${hospital}\nAttending Doctor: ${doctor}\nNext Visit: ${currentReport.nextVisit}`);
+            } catch (e) {
+                alert('Alert dispatch failed.');
+            }
+        }
+
+        calcBMI();
+    </script>
+</body>
+</html>
